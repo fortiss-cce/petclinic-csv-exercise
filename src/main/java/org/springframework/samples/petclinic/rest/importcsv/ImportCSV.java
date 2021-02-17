@@ -16,7 +16,6 @@ import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.LinkedList;
 import java.util.List;
-import java.util.regex.PatternSyntaxException;
 import java.util.stream.Collectors;
 
 @RestController
@@ -71,7 +70,7 @@ public class ImportCSV {
      *
      * @param csv the csv string from the user
      * @return pets list of pets
-     * @throws IncorrectFormatException
+     * @throws IncorrectFormatException the user input is malformatted
      */
     private List<Pet> ParseFields(String csv) throws IncorrectFormatException {
         int i = 0;
@@ -79,51 +78,43 @@ public class ImportCSV {
         Pet pet;
         pet = new Pet();
 
-        String[] arrOfCsv = csv.split(";", 0);
-        pet.setName(arrOfCsv[0]);
+        String[] arrayOfCsv = csv.split(";", 0);
+        pet.setName(arrayOfCsv[0]);
 
         try {
-            pet.setBirthDate((new SimpleDateFormat("yyyy-MM-dd")).parse(arrOfCsv[1]));
+            pet.setBirthDate((new SimpleDateFormat("yyyy-MM-dd")).parse(arrayOfCsv[1]));
         } catch (ParseException e) {
             throw new IncorrectFormatException("Date not valid");
         }
 
-        if (pet != null) {
-            ArrayList<PetType> ts = (ArrayList<PetType>) clinicService.findPetTypes();
-            for (int j = 0; j < ts.size(); j++) {
-                if (ts.get(j).getName().toLowerCase().equals(arrOfCsv[2])) {
-                    pet.setType(ts.get(j));
-                    break;
-                }
+        ArrayList<PetType> petTypes = (ArrayList<PetType>) clinicService.findPetTypes();
+        for (PetType petType : petTypes) {
+            if (petType.getName().toLowerCase().equals(arrayOfCsv[2])) {
+                pet.setType(petType);
+                break;
             }
         }
 
-        if (pet != null) {
-            String owner = arrOfCsv[3];
-            List<Owner> matchingOwners = clinicService.findAllOwners()
-                .stream()
-                .filter(o -> o.getLastName().equals(owner))
-                .collect(Collectors.toList());
+        String owner = arrayOfCsv[3];
+        List<Owner> matchingOwners = clinicService.findAllOwners()
+            .stream()
+            .filter(o -> o.getLastName().equals(owner))
+            .collect(Collectors.toList());
 
-            if (matchingOwners.size() == 0) {
-                throw new IncorrectFormatException("Owner not found");
-            }
-            if (matchingOwners.size() > 1) {
-                throw new IncorrectFormatException("Owner not unique");
-            }
-            pet.setOwner(matchingOwners.iterator().next());
+        if (matchingOwners.size() == 0) {
+            throw new IncorrectFormatException("Owner not found");
         }
+        if (matchingOwners.size() > 1) {
+            throw new IncorrectFormatException("Owner not unique");
+        }
+        pet.setOwner(matchingOwners.iterator().next());
 
-        if (arrOfCsv[4].toLowerCase().equals("add")) {
+        if (arrayOfCsv[4].toLowerCase().equals("add")) {
             clinicService.savePet(pet);
         } else {
-            for (Pet q : pet.getOwner().getPets()) {
-                if (q.getName().equals(pet.getName())) {
-                    if (q.getType().getId().equals(pet.getType().getId())) {
-                        if (pet.getBirthDate().equals(q.getBirthDate())) {
-                            clinicService.deletePet(q);
-                        }
-                    }
+            for (Pet queuePet : pet.getOwner().getPets()) {
+                if (comparePets(pet, queuePet)) {
+                    clinicService.deletePet(queuePet);
                 }
             }
         }
@@ -132,4 +123,18 @@ public class ImportCSV {
 
         return pets;
     }
+
+    private boolean comparePets(Pet pet, Pet queuePet) {
+        boolean isSamePet = false;
+        try {
+            if (queuePet.getName().equals(pet.getName()) && queuePet.getType().getId()
+                .equals(pet.getType().getId()) && pet.getBirthDate().equals(queuePet.getBirthDate())) {
+                isSamePet = true;
+            }
+        } catch (NullPointerException nullpointer) {
+            System.out.println("A pet is missing :(");
+        }
+        return isSamePet;
+    }
+
 }
