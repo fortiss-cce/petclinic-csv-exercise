@@ -16,9 +16,8 @@ import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.regex.PatternSyntaxException;
 import java.util.stream.Collectors;
-
-//test
 
 @RestController
 @CrossOrigin(exposedHeaders = "errors, content-type")
@@ -28,114 +27,109 @@ public class ImportCSV {
     @Autowired
     private ClinicService clinicService;
 
+
+    /**
+     * Method for parsing the csv and give a HTTP reply to the REST
+     *
+     * @param csv the csv string from the user
+     * @return ResponseEntity the HTTP response
+     */
     @PreAuthorize("hasRole(@roles.OWNER_ADMIN)")
     @RequestMapping(value = "importPets",
         method = RequestMethod.POST,
         consumes = "text/plain",
         produces = "application/json")
+
     public ResponseEntity<List<Pet>> importPets(@RequestBody String csv) {
 
+        List<Pet> pets = new LinkedList<Pet>();
+
+        try{
+            pets = ParseFields(csv);
+        } catch (IncorrectFormatException e) {
+            HttpHeaders headers = new HttpHeaders();
+            headers.add("errors", e.getMessage());
+            return new ResponseEntity<List<Pet>>(headers, HttpStatus.BAD_REQUEST);
+        }
+
+        return new ResponseEntity<List<Pet>>(pets, HttpStatus.OK);
+    }
+
+    /**
+     * Custom Exception which can arise during csv string parsing, error message
+     * contains where the exception was raised
+     */
+    private class IncorrectFormatException extends Exception {
+        public IncorrectFormatException(String errorMessage) {
+            super(errorMessage);
+        }
+    }
+
+    /**
+     * Method which receives a string from the csv and pars it to a list of pets
+     * which is then returns. Exceptions are thrown upon the error field
+     *
+     * @param csv the csv string from the user
+     * @return pets list of pets
+     * @throws IncorrectFormatException
+     */
+    private List<Pet> ParseFields(String csv) throws IncorrectFormatException {
         int i = 0;
         List<Pet> pets = new LinkedList<Pet>();
         Pet pet;
+        pet = new Pet();
 
-        do {
-            pet = new Pet();
+        String[] arrOfCsv = csv.split(";", 0);
+        pet.setName(arrOfCsv[0]);
 
-            String field = "";
-            while (i < csv.length() && csv.charAt(i) != ';') {
-                field += csv.charAt(i++);
-            }
-            i++;
+        try {
+            pet.setBirthDate((new SimpleDateFormat("yyyy-MM-dd")).parse(arrOfCsv[1]));
+        } catch (ParseException e) {
+            throw new IncorrectFormatException("Date not valid");
+        }
 
-            pet.setName(field);
-
-            field = "";
-            while (i < csv.length() && csv.charAt(i) != ';') {
-                field += csv.charAt(i++);
-            }
-            i++;
-
-            try {
-                pet.setBirthDate((new SimpleDateFormat("yyyy-MM-dd")).parse(field));
-            } catch (ParseException e) {
-                HttpHeaders headers = new HttpHeaders();
-                headers.add("errors", "date " + field + " not valid");
-                return new ResponseEntity<List<Pet>>(headers, HttpStatus.BAD_REQUEST);
-            }
-
-            field = "";
-            while (i < csv.length() && csv.charAt(i) != ';') {
-                field += csv.charAt(i++);
-            }
-            i++;
-
-            if (pet != null) {
-                ArrayList<PetType> ts = (ArrayList<PetType>) clinicService.findPetTypes();
-                for (int j = 0; j < ts.size(); j++) {
-                    if (ts.get(j).getName().toLowerCase().equals(field)) {
-                        pet.setType(ts.get(j));
-                        break;
-                    }
+        if (pet != null) {
+            ArrayList<PetType> ts = (ArrayList<PetType>) clinicService.findPetTypes();
+            for (int j = 0; j < ts.size(); j++) {
+                if (ts.get(j).getName().toLowerCase().equals(arrOfCsv[2])) {
+                    pet.setType(ts.get(j));
+                    break;
                 }
             }
+        }
 
-            field = "";
-            while (i < csv.length() && (csv.charAt(i) != ';' && csv.charAt(i) != '\n')) {
-                field += csv.charAt(i++);
+        if (pet != null) {
+            String owner = arrOfCsv[3];
+            List<Owner> matchingOwners = clinicService.findAllOwners()
+                .stream()
+                .filter(o -> o.getLastName().equals(owner))
+                .collect(Collectors.toList());
+
+            if (matchingOwners.size() == 0) {
+                throw new IncorrectFormatException("Owner not found");
             }
-
-            if (pet != null) {
-                String owner = field;
-                List<Owner> matchingOwners = clinicService.findAllOwners()
-                    .stream()
-                    .filter(o -> o.getLastName().equals(owner))
-                    .collect(Collectors.toList());
-
-                if (matchingOwners.size() == 0) {
-                    HttpHeaders headers = new HttpHeaders();
-                    headers.add("errors", "Owner not found");
-                    return new ResponseEntity<List<Pet>>(headers, HttpStatus.BAD_REQUEST);
-                }
-                if (matchingOwners.size() > 1) {
-                    HttpHeaders headers = new HttpHeaders();
-                    headers.add("errors", "Owner not unique");
-                    return new ResponseEntity<List<Pet>>(headers, HttpStatus.BAD_REQUEST);
-                }
-                pet.setOwner(matchingOwners.iterator().next());
+            if (matchingOwners.size() > 1) {
+                throw new IncorrectFormatException("Owner not unique");
             }
+            pet.setOwner(matchingOwners.iterator().next());
+        }
 
-            if (csv.charAt(i) == ';') {
-                i++;
-
-                field = "";
-                while (i < csv.length() && csv.charAt(i) != '\n') {
-                    field += csv.charAt(i++);
-                }
-
-                if (field.toLowerCase().equals("add")) {
-                    clinicService.savePet(pet);
-                } else {
-                    for (Pet q : pet.getOwner().getPets()) {
-                        if (q.getName().equals(pet.getName())) {
-                            if (q.getType().getId().equals(pet.getType().getId())) {
-                                if (pet.getBirthDate().equals(q.getBirthDate())) {
-                                    clinicService.deletePet(q);
-                                }
-                            }
+        if (arrOfCsv[4].toLowerCase().equals("add")) {
+            clinicService.savePet(pet);
+        } else {
+            for (Pet q : pet.getOwner().getPets()) {
+                if (q.getName().equals(pet.getName())) {
+                    if (q.getType().getId().equals(pet.getType().getId())) {
+                        if (pet.getBirthDate().equals(q.getBirthDate())) {
+                            clinicService.deletePet(q);
                         }
                     }
                 }
-
-            } else {
-                clinicService.savePet(pet);
             }
-            i++;
+        }
 
-            pets.add(pet);
+        pets.add(pet);
 
-        } while (i < csv.length() && pet != null);
-
-        return new ResponseEntity<List<Pet>>(pets, HttpStatus.OK);
+        return pets;
     }
 }
