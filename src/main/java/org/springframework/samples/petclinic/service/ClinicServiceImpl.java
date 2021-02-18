@@ -67,7 +67,7 @@ public class ClinicServiceImpl implements ClinicService {
         this.vetRepository = vetRepository;
         this.ownerRepository = ownerRepository;
         this.visitRepository = visitRepository;
-        this.specialtyRepository = specialtyRepository; 
+        this.specialtyRepository = specialtyRepository;
 		this.petTypeRepository = petTypeRepository;
     }
 
@@ -154,13 +154,7 @@ public class ClinicServiceImpl implements ClinicService {
 	@Override
 	@Transactional(readOnly = true)
 	public PetType findPetTypeById(int petTypeId) {
-		PetType petType = null;
-		try {
-			petType = petTypeRepository.findById(petTypeId);
-		} catch (ObjectRetrievalFailureException|EmptyResultDataAccessException e) {
-		// just ignore not found exceptions for Jdbc/Jpa realization
-			return null;
-		}
+        PetType petType = petTypeRepository.findById(petTypeId);
 		return petType;
 	}
 
@@ -222,13 +216,7 @@ public class ClinicServiceImpl implements ClinicService {
 	@Override
 	@Transactional(readOnly = true)
 	public Owner findOwnerById(int id) throws DataAccessException {
-		Owner owner = null;
-		try {
-			owner = ownerRepository.findById(id);
-		} catch (ObjectRetrievalFailureException|EmptyResultDataAccessException e) {
-		// just ignore not found exceptions for Jdbc/Jpa realization
-			return null;
-		}
+		Owner owner = ownerRepository.findById(id);
 		return owner;
 	}
 
@@ -249,14 +237,14 @@ public class ClinicServiceImpl implements ClinicService {
 	@Transactional
 	public void savePet(Pet pet) throws DataAccessException {
 		petRepository.save(pet);
-		
+
 	}
 
 	@Override
 	@Transactional
 	public void saveVisit(Visit visit) throws DataAccessException {
 		visitRepository.save(visit);
-		
+
 	}
 
 	@Override
@@ -270,7 +258,7 @@ public class ClinicServiceImpl implements ClinicService {
 	@Transactional
 	public void saveOwner(Owner owner) throws DataAccessException {
 		ownerRepository.save(owner);
-		
+
 	}
 
 	@Override
@@ -284,8 +272,8 @@ public class ClinicServiceImpl implements ClinicService {
 	public Collection<Visit> findVisitsByPetId(int petId) {
 		return visitRepository.findByPetId(petId);
 	}
-	
-	
+
+
 
 
 }

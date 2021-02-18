@@ -72,7 +72,6 @@ public class Pet extends NamedEntity {
     @OneToMany(cascade = CascadeType.ALL, mappedBy = "pet", fetch = FetchType.EAGER)
     private Set<Visit> visits;
 
-
     public void setBirthDate(Date birthDate) {
         this.birthDate = birthDate;
     }
@@ -117,6 +116,13 @@ public class Pet extends NamedEntity {
     public void addVisit(Visit visit) {
         getVisitsInternal().add(visit);
         visit.setPet(this);
+    }
+
+    public boolean equals(Object other){
+        Pet otherPet = (Pet) other;
+
+        return this.getName().equals(otherPet.getName()) && this.type.id.equals(otherPet.type.id) &&
+            this.birthDate.equals(otherPet.birthDate);
     }
 
 }
