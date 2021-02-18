@@ -48,28 +48,20 @@ public class ImportCSV {
         }
     }
 
-    public List<Entry> parseCSV(String csv){
-        List<Entry> entries = new List<Entry>();
-
+    public List<String> parseCSV(String csv){
         // split csv with '\n' sign to get its rows
         List<String> lines = csv.split('\n');
 
-        Boolean isParsable = True;
-        for(line: lines){
-            // it is assumed the count function return the number of occurence of ';' in the text
-            if(line.count(';') != 4){
-                isParsable = False;
-                break;
-            }
-        }
+        return lines
+    }
 
-        // early termination due to the fact that ';' are not correct in at least an entry
-        if(!isParsable){
-            return entries;
-        }
-
+    public List<Entry> createEntries(List<String> lines){
+        List<Entry> entries = new List<Entry>();
         // now parse each field
         for(line: lines){
+            if(line.count(';') != 4){
+                continue
+            }
             // it is assumed that these functions are properly defined to check the validity of each field,
             // and returns the parsed fields . This can also be wrapped in another function 'toEntry(line)''
             // some of the validity check of the original code is included, e.g., check for none or multiple pet owner
@@ -83,7 +75,6 @@ public class ImportCSV {
         }
         return entries;
     }
-
     @PreAuthorize("hasRole(@roles.OWNER_ADMIN)")
     @RequestMapping(value = "importPets",
         method = RequestMethod.POST,
@@ -92,9 +83,10 @@ public class ImportCSV {
     public ResponseEntity<List<Pet>> importPets(@RequestBody String csv) {
         // parse CSV and do validity check
 
-        List<Entry> entries = parseCSV(csv);
-        List<Pet> pets = new LinkedList<Pet>();
+        List<String> lines = parseCSV(csv);
+        List<Entry> entries = createEntries(lines);
 
+        List<Pet> pets = new LinkedList<Pet>();
         for(entry: entries){
             // we assume pet now accepts an entry, and set its attributes accordingly, e.g. : pet.setName(entry.petName)
             Pet pet(entry);
