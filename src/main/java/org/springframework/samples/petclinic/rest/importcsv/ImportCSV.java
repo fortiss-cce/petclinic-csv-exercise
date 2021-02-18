@@ -59,9 +59,6 @@ public class ImportCSV {
         List<Pet> response = new ArrayList<>();
         String[] commands = csv.split("\n");
 
-        // execution policy: if a faulty command is discovered, should we execute the rest, execute non, execute only the ones before?
-        // create a method to report for each error type
-
         for(String command: commands){
             String[] fields = parseCommand(command);
 
