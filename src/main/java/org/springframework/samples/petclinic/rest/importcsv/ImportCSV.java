@@ -113,7 +113,7 @@ public class ImportCSV {
             clinicService.savePet(pet);
         } else {
             for (Pet queuePet : pet.getOwner().getPets()) {
-                if (comparePets(pet, queuePet)) {
+                if (isSamePet(pet, queuePet)) {
                     clinicService.deletePet(queuePet);
                 }
             }
@@ -124,7 +124,14 @@ public class ImportCSV {
         return pets;
     }
 
-    private boolean comparePets(Pet pet, Pet queuePet) {
+    /**
+     * Method to compare pets in the database and the inserted csv line
+     *
+     * @param pet the pet which need to be compare
+     * @param queuePet the pet obtained from the database
+     * @return isSamePet
+     */
+    private boolean isSamePet(Pet pet, Pet queuePet) throws IncorrectFormatException {
         boolean isSamePet = false;
         try {
             if (queuePet.getName().equals(pet.getName()) && queuePet.getType().getId()
@@ -133,6 +140,7 @@ public class ImportCSV {
             }
         } catch (NullPointerException nullpointer) {
             System.out.println("A pet is missing :(");
+            throw new IncorrectFormatException("Pet not existing");
         }
         return isSamePet;
     }
