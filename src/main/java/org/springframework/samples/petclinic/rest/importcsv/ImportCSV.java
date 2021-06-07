@@ -32,27 +32,18 @@ public class ImportCSV {
         consumes = "text/plain",
         produces = "application/json")
     public ResponseEntity<List<Pet>> importPets(@RequestBody String csv) {
-
-        int i = 0;
         List<Pet> pets = new LinkedList<Pet>();
-        Pet pet;
+
+        CsvFieldReader fieldReader = new CsvFieldReader(csv);
 
         do {
-            pet = new Pet();
+            Pet pet = new Pet();
 
-            String field = "";
-            while (i < csv.length() && csv.charAt(i) != ';') {
-                field += csv.charAt(i++);
-            }
-            i++;
+            String field = fieldReader.nextField();
 
             pet.setName(field);
 
-            field = "";
-            while (i < csv.length() && csv.charAt(i) != ';') {
-                field += csv.charAt(i++);
-            }
-            i++;
+            field = fieldReader.nextField();
 
             try {
                 pet.setBirthDate((new SimpleDateFormat("yyyy-MM-dd")).parse(field));
@@ -62,54 +53,40 @@ public class ImportCSV {
                 return new ResponseEntity<List<Pet>>(headers, HttpStatus.BAD_REQUEST);
             }
 
-            field = "";
-            while (i < csv.length() && csv.charAt(i) != ';') {
-                field += csv.charAt(i++);
-            }
-            i++;
+            field = fieldReader.nextField();
 
-            if (pet != null) {
-                ArrayList<PetType> ts = (ArrayList<PetType>) clinicService.findPetTypes();
-                for (int j = 0; j < ts.size(); j++) {
-                    if (ts.get(j).getName().toLowerCase().equals(field)) {
-                        pet.setType(ts.get(j));
-                        break;
-                    }
+            ArrayList<PetType> ts = (ArrayList<PetType>) clinicService.findPetTypes();
+            for (PetType t : ts) {
+                if (t.getName().toLowerCase().equals(field)) {
+                    pet.setType(t);
+                    break;
                 }
             }
 
-            field = "";
-            while (i < csv.length() && (csv.charAt(i) != ';' && csv.charAt(i) != '\n')) {
-                field += csv.charAt(i++);
+
+            field = fieldReader.nextField();
+
+            String owner = field;
+            List<Owner> matchingOwners = clinicService.findAllOwners()
+                .stream()
+                .filter(o -> o.getLastName().equals(owner))
+                .collect(Collectors.toList());
+
+            if (matchingOwners.size() == 0) {
+                HttpHeaders headers = new HttpHeaders();
+                headers.add("errors", "Owner not found");
+                return new ResponseEntity<List<Pet>>(headers, HttpStatus.BAD_REQUEST);
             }
-
-            if (pet != null) {
-                String owner = field;
-                List<Owner> matchingOwners = clinicService.findAllOwners()
-                    .stream()
-                    .filter(o -> o.getLastName().equals(owner))
-                    .collect(Collectors.toList());
-
-                if (matchingOwners.size() == 0) {
-                    HttpHeaders headers = new HttpHeaders();
-                    headers.add("errors", "Owner not found");
-                    return new ResponseEntity<List<Pet>>(headers, HttpStatus.BAD_REQUEST);
-                }
-                if (matchingOwners.size() > 1) {
-                    HttpHeaders headers = new HttpHeaders();
-                    headers.add("errors", "Owner not unique");
-                    return new ResponseEntity<List<Pet>>(headers, HttpStatus.BAD_REQUEST);
-                }
-                pet.setOwner(matchingOwners.iterator().next());
+            if (matchingOwners.size() > 1) {
+                HttpHeaders headers = new HttpHeaders();
+                headers.add("errors", "Owner not unique");
+                return new ResponseEntity<List<Pet>>(headers, HttpStatus.BAD_REQUEST);
             }
+            pet.setOwner(matchingOwners.iterator().next());
 
-            if (csv.charAt(i) == ';') {
-                i++;
 
-                field = "";
-                while (i < csv.length() && csv.charAt(i) != '\n') {
-                    field += csv.charAt(i++);
-                }
+            if (!fieldReader.isEndOfLine()) {
+                field = fieldReader.nextField();
 
                 if (field.toLowerCase().equals("add")) {
                     clinicService.savePet(pet);
@@ -128,12 +105,52 @@ public class ImportCSV {
             } else {
                 clinicService.savePet(pet);
             }
-            i++;
-
             pets.add(pet);
 
-        } while (i < csv.length() && pet != null);
+        } while (!fieldReader.atEnd());
 
         return new ResponseEntity<List<Pet>>(pets, HttpStatus.OK);
     }
+
+    private static class CsvFieldReader {
+        private int position;
+        private final String csv;
+
+        public CsvFieldReader(String csv) {
+            this.position = 0;
+            this.csv = csv;
+        }
+
+        public String nextField() {
+            int startIndex = position;
+            while (!atEnd() && csv.charAt(position) != ';' && csv.charAt(position) != '\n') {
+                ++position;
+            }
+            String field = csv.substring(startIndex, position);
+
+            // need to go past the ";" and "\n" characters
+            if (!atEnd()) {
+                ++position;
+            }
+
+            return field;
+        }
+
+        private boolean atEnd() {
+            return position == csv.length();
+        }
+
+        public boolean isEndOfLine() {
+            if (position == 0) {
+                return atEnd();
+            } else {
+                return csv.charAt(position - 1) == '\n';
+            }
+        }
+
+        public boolean hasNextField() {
+            return !atEnd();
+        }
+    }
+
 }
