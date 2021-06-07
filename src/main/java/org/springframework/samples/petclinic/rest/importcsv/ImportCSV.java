@@ -13,15 +13,24 @@ import org.springframework.web.bind.annotation.*;
 
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
-import java.util.ArrayList;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.Optional;
 import java.util.stream.Collectors;
 
 @RestController
 @CrossOrigin(exposedHeaders = "errors, content-type")
 @RequestMapping("api/import")
 public class ImportCSV {
+
+    private static final String FIELD_DELIMITER = ";";
+    private static final String LINE_DELIMITER = "\n";
+    private static int NAME = 0;
+    private static int BIRTH_DATE = 1;
+    private static int PET_TYPE = 2;
+    private static int OWNER = 3;
+    private static int ACTION = 4;
+
 
     @Autowired
     private ClinicService clinicService;
@@ -33,107 +42,97 @@ public class ImportCSV {
         produces = "application/json")
     public ResponseEntity<List<Pet>> importPets(@RequestBody String csv) {
 
-        int i = 0;
-        List<Pet> pets = new LinkedList<Pet>();
-        Pet pet;
+        List<Pet> pets = new LinkedList<>();
 
-        do {
-            pet = new Pet();
-
-            String field = "";
-            while (i < csv.length() && csv.charAt(i) != ';') {
-                field += csv.charAt(i++);
-            }
-            i++;
-
-            pet.setName(field);
-
-            field = "";
-            while (i < csv.length() && csv.charAt(i) != ';') {
-                field += csv.charAt(i++);
-            }
-            i++;
-
+        String[] lines = csv.split(LINE_DELIMITER);
+        for (String line : lines) {
+            String petString = line.trim();
             try {
-                pet.setBirthDate((new SimpleDateFormat("yyyy-MM-dd")).parse(field));
+                Pet pet = parsePetString(petString);
+                pets.add(pet);
             } catch (ParseException e) {
                 HttpHeaders headers = new HttpHeaders();
-                headers.add("errors", "date " + field + " not valid");
-                return new ResponseEntity<List<Pet>>(headers, HttpStatus.BAD_REQUEST);
+                headers.add("errors", e.getMessage());
+                return new ResponseEntity<>(headers, HttpStatus.BAD_REQUEST);
             }
+        }
+        return new ResponseEntity<>(pets, HttpStatus.OK);
+    }
 
-            field = "";
-            while (i < csv.length() && csv.charAt(i) != ';') {
-                field += csv.charAt(i++);
+    private Pet parsePetString(String petString) throws ParseException {
+        Pet pet = new Pet();
+        String[] fields = petString.split(FIELD_DELIMITER);
+
+        if (fields.length != 5){
+            String error = String.format("Wrong number of fields found. Expected 5 got %d", fields.length);
+            throw new ParseException(error, -1);
+        }
+
+        pet.setName(fields[NAME].trim());
+
+        parseBirthDateFiled(pet, fields[BIRTH_DATE].trim());
+
+        parseTypeString(pet, fields[PET_TYPE].trim());
+
+        parseOwner(pet, fields[OWNER].trim());
+
+        String action = fields[ACTION].trim();
+        if (action.toLowerCase().equals("add")){
+            clinicService.savePet(pet);
+        } else {
+            deletePet(pet);
+        }
+
+        return pet;
+    }
+
+    private void parseOwner(Pet pet, String owner) throws ParseException{
+        List<Owner> matchingOwners = clinicService.findAllOwners()
+            .stream()
+            .filter(o -> o.getLastName().equals(owner))
+            .collect(Collectors.toList());
+
+        if (matchingOwners.size() == 0) {
+            throw new ParseException("Owner not found", -1);
+        }
+
+        if (matchingOwners.size() > 1) {
+            throw new ParseException("Owner not unique", -1);
+        }
+        pet.setOwner(matchingOwners.iterator().next());
+    }
+
+    private void parseTypeString(Pet pet, String petTypeString) throws ParseException {
+        Optional<PetType> petType = clinicService.findPetTypes()
+            .stream()
+            .filter(t -> t.getName().equals(petTypeString))
+            .findFirst();
+        if (!petType.isPresent()){
+            throw new ParseException("PetType not found", -1);
+        }
+        pet.setType(petType.get());
+    }
+
+    private void parseBirthDateFiled(Pet pet, String dateFiled)  throws ParseException {
+        try {
+            pet.setBirthDate((new SimpleDateFormat("yyyy-MM-dd")).parse(dateFiled));
+        }  catch (ParseException e) {
+            throw new ParseException("date " + dateFiled + " not valid", -1);
+        }
+    }
+
+    private void deletePet(Pet pet){
+        List<Pet> allPetsOfOwner = pet.getOwner().getPets();
+        allPetsOfOwner.forEach(ownedPet -> {
+            if (comparePet(ownedPet, pet)){
+                clinicService.deletePet(ownedPet);
             }
-            i++;
+        });
+    }
 
-            if (pet != null) {
-                ArrayList<PetType> ts = (ArrayList<PetType>) clinicService.findPetTypes();
-                for (int j = 0; j < ts.size(); j++) {
-                    if (ts.get(j).getName().toLowerCase().equals(field)) {
-                        pet.setType(ts.get(j));
-                        break;
-                    }
-                }
-            }
-
-            field = "";
-            while (i < csv.length() && (csv.charAt(i) != ';' && csv.charAt(i) != '\n')) {
-                field += csv.charAt(i++);
-            }
-
-            if (pet != null) {
-                String owner = field;
-                List<Owner> matchingOwners = clinicService.findAllOwners()
-                    .stream()
-                    .filter(o -> o.getLastName().equals(owner))
-                    .collect(Collectors.toList());
-
-                if (matchingOwners.size() == 0) {
-                    HttpHeaders headers = new HttpHeaders();
-                    headers.add("errors", "Owner not found");
-                    return new ResponseEntity<List<Pet>>(headers, HttpStatus.BAD_REQUEST);
-                }
-                if (matchingOwners.size() > 1) {
-                    HttpHeaders headers = new HttpHeaders();
-                    headers.add("errors", "Owner not unique");
-                    return new ResponseEntity<List<Pet>>(headers, HttpStatus.BAD_REQUEST);
-                }
-                pet.setOwner(matchingOwners.iterator().next());
-            }
-
-            if (csv.charAt(i) == ';') {
-                i++;
-
-                field = "";
-                while (i < csv.length() && csv.charAt(i) != '\n') {
-                    field += csv.charAt(i++);
-                }
-
-                if (field.toLowerCase().equals("add")) {
-                    clinicService.savePet(pet);
-                } else {
-                    for (Pet q : pet.getOwner().getPets()) {
-                        if (q.getName().equals(pet.getName())) {
-                            if (q.getType().getId().equals(pet.getType().getId())) {
-                                if (pet.getBirthDate().equals(q.getBirthDate())) {
-                                    clinicService.deletePet(q);
-                                }
-                            }
-                        }
-                    }
-                }
-
-            } else {
-                clinicService.savePet(pet);
-            }
-            i++;
-
-            pets.add(pet);
-
-        } while (i < csv.length() && pet != null);
-
-        return new ResponseEntity<List<Pet>>(pets, HttpStatus.OK);
+    private boolean comparePet(Pet pet1, Pet pet2){
+        return  pet1.getName().equals(pet2.getName()) &&
+                pet1.getType().getId().equals(pet2.getType().getId()) &&
+                pet1.getBirthDate().equals(pet2.getBirthDate());
     }
 }
