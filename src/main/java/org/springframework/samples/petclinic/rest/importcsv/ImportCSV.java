@@ -144,13 +144,13 @@ public class ImportCSV {
             .filter(o -> o.getLastName().equals(owner))
             .collect(Collectors.toList());
 
-        if (matchingOwners.size() == 0) {
+        if (matchingOwners.isEmpty()) {
             return generateErrorResponse("Owner not found");
         }
         if (matchingOwners.size() > 1) {
             return generateErrorResponse("Owner not unique");
         }
-        pet.setOwner(matchingOwners.iterator().next());
+        pet.setOwner(matchingOwners.get(0));
         return null;
     }
 
