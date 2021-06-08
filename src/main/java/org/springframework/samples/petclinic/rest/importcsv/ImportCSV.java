@@ -106,11 +106,10 @@ public class ImportCSV {
         setPetType(pet, petType);
 
         String owner = fields[curFieldId++];
+        ResultPair ownerNotFoundError = setPetOwner(pet, owner);
+        if (ownerNotFoundError != null) return ownerNotFoundError;
 
-        ResultPair ownerNotFound = setPetOwner(pet, owner);
-        if (ownerNotFound != null) return ownerNotFound;
-
-        executeOperation(fields, pet, curFieldId);
+        handleOptionalOperationField(fields, pet, curFieldId);
 
         return new ResultPair(pet);
     }
@@ -124,17 +123,21 @@ public class ImportCSV {
         return null;
     }
 
-    private void executeOperation(String[] fields, Pet pet, int curFieldId) {
+    private void handleOptionalOperationField(String[] fields, Pet pet, int curFieldId) {
         if (curFieldId < fields.length) {
             String operation = fields[curFieldId++];
-
-            if (operation.equalsIgnoreCase("add")) {
-                clinicService.savePet(pet);
-            } else {
-                removePet(pet);
-            }
+            parseAndExecuteOperation(pet, operation);
         } else {
+            // Default operation
             clinicService.savePet(pet);
+        }
+    }
+
+    private void parseAndExecuteOperation(Pet pet, String operation) {
+        if (operation.equalsIgnoreCase("add")) {
+            clinicService.savePet(pet);
+        } else if (operation.equalsIgnoreCase("delete")) {
+            removePet(pet);
         }
     }
 
