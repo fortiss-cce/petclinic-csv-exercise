@@ -109,7 +109,7 @@ public class ImportCSV {
         ResultPair ownerNotFoundError = setPetOwner(pet, owner);
         if (ownerNotFoundError != null) return ownerNotFoundError;
 
-        handleOptionalOperationField(fields, pet, curFieldId);
+        handleOptionalOperationField(pet, fields, curFieldId);
 
         return new ResultPair(pet);
     }
@@ -123,9 +123,9 @@ public class ImportCSV {
         return null;
     }
 
-    private void handleOptionalOperationField(String[] fields, Pet pet, int curFieldId) {
+    private void handleOptionalOperationField(Pet pet, String[] fields, int curFieldId) {
         if (curFieldId < fields.length) {
-            String operation = fields[curFieldId++];
+            String operation = fields[curFieldId];
             parseAndExecuteOperation(pet, operation);
         } else {
             // Default operation
