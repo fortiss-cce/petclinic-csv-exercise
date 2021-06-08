@@ -13,7 +13,7 @@ import org.springframework.web.bind.annotation.*;
 
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
-import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Date;
 import java.util.LinkedList;
 import java.util.List;
@@ -23,11 +23,59 @@ import java.util.stream.Collectors;
 @CrossOrigin(exposedHeaders = "errors, content-type")
 @RequestMapping("api/import")
 public class ImportCSV {
+
     private final char fieldSeparator = ';';
     private final char lineSeparator = '\n';
     private final String dateFormat = "yyyy-MM-dd";
     @Autowired
     private ClinicService clinicService;
+
+    @PreAuthorize("hasRole(@roles.OWNER_ADMIN)")
+    @RequestMapping(value = "importPets",
+        method = RequestMethod.POST,
+        consumes = "text/plain",
+        produces = "application/json")
+    public ResponseEntity<List<Pet>> importPets(@RequestBody String csv) {
+        List<Pet> pets = new LinkedList<Pet>();
+        String[] lines = csv.split(String.valueOf(lineSeparator));
+        for (String line : lines) {
+            try {
+                Pet pet = parsePetFromLine(line);
+                pets.add(pet);
+            } catch (ParseException e) {
+                HttpHeaders headers = new HttpHeaders();
+                headers.add("errors", e.getMessage());
+                return new ResponseEntity<List<Pet>>(headers, HttpStatus.BAD_REQUEST);
+            }
+        }
+        return new ResponseEntity<List<Pet>>(pets, HttpStatus.OK);
+    }
+
+    /**
+     * Parses a pet from a raw line of format: name;date;petType;owner[;operation]\n
+     * @param line
+     * @return
+     * @throws ParseException
+     */
+    private Pet parsePetFromLine(String line) throws ParseException {
+        Pet pet = new Pet();
+        String[] fields = line.split(String.valueOf(fieldSeparator));
+        pet.setName(fields[0]);
+        Date birthDate = parseBirthDate(fields[1]);
+        pet.setBirthDate(birthDate);
+        PetType petType = parsePetType(fields[2]);
+        pet.setType(petType);
+        Owner owner = parseOwner(fields[3]);
+        pet.setOwner(owner);
+
+        if (fields.length > 4) {
+            String operation = fields[4];
+            performOperation(operation, pet);
+        } else { // no operation provided
+            performOperation("add", pet);
+        }
+        return pet;
+    }
 
     private Date parseBirthDate(String date) throws ParseDateException {
         try {
@@ -38,10 +86,10 @@ public class ImportCSV {
     }
 
     private PetType parsePetType(String petType) {
-        List<PetType> ts = (ArrayList<PetType>) clinicService.findPetTypes();
-        for (PetType t : ts) {
-            if (t.getName().toLowerCase().equals(petType)) {
-                return t;
+        Collection<PetType> allPetTypes = clinicService.findPetTypes();
+        for (PetType type : allPetTypes) {
+            if (type.getName().equalsIgnoreCase(petType)) {
+                return type;
             }
         }
         return null;
@@ -63,62 +111,16 @@ public class ImportCSV {
     }
 
     private void performOperation(String operationString, Pet pet) {
-        if (operationString.toLowerCase().equals("add")) {
+        if (operationString.equalsIgnoreCase("add")) {
             clinicService.savePet(pet);
         } else {
             // operation is "delete"
-            for (Pet q : pet.getOwner().getPets()) {
-                if (q.getName().equals(pet.getName()) &&
-                    q.getType().getId().equals(pet.getType().getId()) &&
-                    q.getBirthDate().equals(pet.getBirthDate())) {
-
-                    clinicService.deletePet(q);
-
+            for (Pet petFromOwner : pet.getOwner().getPets()) {
+                if (petFromOwner.equals(pet)) {
+                    clinicService.deletePet(petFromOwner);
                 }
             }
         }
-    }
-
-    private Pet parsePetFromLine(String line) throws ParseException {
-        // name;date;petType;owner[;operation]\n
-        Pet pet = new Pet();
-        String[] fields = line.split(String.valueOf(fieldSeparator));
-        pet.setName(fields[0]);
-        Date birthDate = parseBirthDate(fields[1]);
-        pet.setBirthDate(birthDate);
-        PetType petType = parsePetType(fields[2]);
-        pet.setType(petType);
-        Owner owner = parseOwner(fields[3]);
-        pet.setOwner(owner);
-
-        if (fields.length > 4) {
-            String operation = fields[4];
-            performOperation(operation, pet);
-        } else { // no operation provided
-            performOperation("add", pet);
-        }
-        return pet;
-    }
-
-    @PreAuthorize("hasRole(@roles.OWNER_ADMIN)")
-    @RequestMapping(value = "importPets",
-        method = RequestMethod.POST,
-        consumes = "text/plain",
-        produces = "application/json")
-    public ResponseEntity<List<Pet>> importPets(@RequestBody String csv) {
-        List<Pet> pets = new LinkedList<Pet>();
-        String[] lines = csv.split(String.valueOf(lineSeparator));
-        for (String line : lines) {
-            try {
-                Pet pet = parsePetFromLine(line);
-                pets.add(pet);
-            } catch (ParseException e) {
-                HttpHeaders headers = new HttpHeaders();
-                headers.add("errors", e.getMessage());
-                return new ResponseEntity<List<Pet>>(headers, HttpStatus.BAD_REQUEST);
-            }
-        }
-        return new ResponseEntity<List<Pet>>(pets, HttpStatus.OK);
     }
 
     private static class ParseOwnerException extends ParseException {
