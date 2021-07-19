@@ -40,6 +40,7 @@ public class ImportCSV {
         do {
             pet = new Pet();
 
+
             String field = "";
             while (i < csv.length() && csv.charAt(i) != ';') {
                 field += csv.charAt(i++);
@@ -48,6 +49,8 @@ public class ImportCSV {
 
             pet.setName(field);
 
+
+            //
             field = "";
             while (i < csv.length() && csv.charAt(i) != ';') {
                 field += csv.charAt(i++);
@@ -136,4 +139,62 @@ public class ImportCSV {
 
         return new ResponseEntity<List<Pet>>(pets, HttpStatus.OK);
     }
+
+
+    public ResponseEntity<List<Pet>> importPets2(@RequestBody String csv){
+        List<PetAttribute> petAttributes = getPetAttributes(csv);
+
+        List<Pet> pets = new LinkedList<>();
+
+        List<String> petTypes = clinicService.findPetTypes().stream().map(pet -> pet.toString().toLowerCase()).collect(Collectors.toList());
+
+        for (PetAttribute petAttribute : petAttributes){
+            if (petAttribute.isPetAttributeValid()){
+                Pet pet = new Pet();
+                pet.setName(petAttribute.getName());
+                try {
+                    pet.setBirthDate(petAttribute.getBirthdayDateFormat());
+                } catch (ParseException e) {
+                    HttpHeaders headers = new HttpHeaders();
+                    headers.add("errors", "date " + petAttribute.getBirthday() + " not valid");
+                    return new ResponseEntity<List<Pet>>(headers, HttpStatus.BAD_REQUEST);
+                }
+
+
+                if (petTypes.contains(petAttribute.getAnimal().toLowerCase())){
+                    //TODO add something here
+                }
+
+                //TODO add owner
+
+                //TODO make it robust by only usind valid entries
+
+            }
+
+        }
+        return new ResponseEntity<List<Pet>>(pets, HttpStatus.OK);
+    }
+
+
+    private List<PetAttribute> getPetAttributes(String csv){
+
+        List<PetAttribute> petAttributes = new LinkedList<>();
+
+        String[] lines = csv.split("\n");
+        for (String line : lines){
+            String[] entries = line.split(";");
+            String name = entries[0];
+            String birthday = entries[1];
+            String animal = entries[2];
+            String owner = entries[3];
+            String operation = entries[4]; // add or delete
+            petAttributes.add(new PetAttribute(name, birthday, animal, owner, operation));
+        }
+        return petAttributes;
+
+    }
+
+
+
+
 }
