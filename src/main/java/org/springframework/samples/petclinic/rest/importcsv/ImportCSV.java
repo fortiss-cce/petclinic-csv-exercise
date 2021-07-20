@@ -36,22 +36,35 @@ public class ImportCSV {
 
         // Bad: We just put i = 10 here and this was not caught by any test
         // @todo: Open an issue? Write a new test?
-        int i = 0;  // @todo lines? characters?
         List<Pet> pets = new LinkedList<Pet>();
         Pet pet;
 
-        do {
+        String [] lines = csv.split("\n");
+
+        for(String line: lines){
+            String [] fields = line.split(";");
             // Process one line of the csv file
             pet = new Pet();
-            //extractName(pet, popNextField(i, csv));  // @todo separate parsing and composition of pet.
-            i = extractName(pet, i, csv);
-            i = extractBirthDate(pet, i, csv);
-            i = extractType(pet, i, csv);
-            i = extractOwner(pet, i, csv);
-            i = updateDatabase(pet, i, csv);
-            pets.add(pet);
-        } while (i < csv.length() && pet != null);
 
+            boolean success = false;
+
+            assert(fields.length >= 4);
+            assert(fields.length <= 5);
+
+            setName(pet, fields[0]);
+            success = setBirthDate(pet, fields[1]);
+            if(!success){
+                HttpHeaders headers = new HttpHeaders();
+                headers.add("errors", "date " + fields[1] + " not valid");
+                return new ResponseEntity<List<Pet>>(headers, HttpStatus.BAD_REQUEST);
+            }
+            success = setType(pet, fields[2]);
+            success = setOwner(pet, fields[3]);
+            if(fields.length == 4){
+                i = updateDatabase(pet, fields[4]);
+            }
+            pets.add(pet);
+        }
         return new ResponseEntity<List<Pet>>(pets, HttpStatus.OK);
     }
 
@@ -89,47 +102,32 @@ public class ImportCSV {
             onePet.getBirthDate().equals(anotherPet.getBirthDate());
     }
 
-    private int extractName(Pet pet, int i, String csv) {
-        String field = "";
+    private int extractName(Pet pet, int i, String csv, String field) {
         i = popNextField(i, field, csv);
-        pet.setName(field);
         i++;
         return i;
     }
 
-    private int extractBirthDate(Pet pet, int i, String csv){
-        String field = "";
-        i = popNextField(i, field, csv);
-
+    private boolean setBirthDate(Pet pet, String value){
         Date date;
-
         try {
-            date = new SimpleDateFormat("yyyy-MM-dd").parse(field);
+            date = new SimpleDateFormat("yyyy-MM-dd").parse(value);
         } catch (ParseException e) {
-            HttpHeaders headers = new HttpHeaders();
-            headers.add("errors", "date " + field + " not valid");
-            return new ResponseEntity<List<Pet>>(headers, HttpStatus.BAD_REQUEST);
+            return false;
         }
         pet.setBirthDate(date);
-        return i;
+        return true;
     }
 
-    private int extractType(Pet pet, int i, String csv){
-        String field = "";
-        i = popNextField(i, field, csv);
-        i++;
-
-        if (pet != null) {
-            ArrayList<PetType> ts = (ArrayList<PetType>) clinicService.findPetTypes();
-            for (int j = 0; j < ts.size(); j++) {
-                if (ts.get(j).getName().toLowerCase().equals(field)) {
-                    pet.setType(ts.get(j));
-                    break;
-                }
+    private boolean setType(Pet pet, String value){
+        ArrayList<PetType> ts = (ArrayList<PetType>) clinicService.findPetTypes();
+        for (int j = 0; j < ts.size(); j++) {
+            if (ts.get(j).getName().toLowerCase().equals(value)) {
+                pet.setType(ts.get(j));
+                return true;
             }
         }
-
-        return i;
+        return false;
     }
 
     private int extractOwner(Pet pet, int i, String csv) {
