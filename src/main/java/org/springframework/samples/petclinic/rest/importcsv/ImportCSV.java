@@ -148,6 +148,7 @@ public class ImportCSV {
 
         List<String> petTypes = clinicService.findPetTypes().stream().map(pet -> pet.toString().toLowerCase()).collect(Collectors.toList());
 
+
         for (PetAttribute petAttribute : petAttributes){
             if (petAttribute.isPetAttributeValid()){
                 Pet pet = new Pet();
@@ -162,7 +163,11 @@ public class ImportCSV {
 
 
                 if (petTypes.contains(petAttribute.getAnimal().toLowerCase())){
-                    //TODO add something here
+                    try {
+                        pet.setType(getPetType(petAttribute.getAnimal()));
+                    } catch (Exception e) {
+                        e.printStackTrace();
+                    }
                 }
 
                 //TODO add owner
@@ -191,6 +196,19 @@ public class ImportCSV {
             petAttributes.add(new PetAttribute(name, birthday, animal, owner, operation));
         }
         return petAttributes;
+
+    }
+
+    private PetType getPetType(String petTypeString) throws Exception {
+
+        for ( PetType petType : clinicService.findPetTypes()) {
+            if (petType.getName().toLowerCase().equals(petTypeString)) {
+                return petType;
+            }
+        }
+        //TODO -> clinicService.savePetType(new PetType(petTypeString));
+
+        throw new Exception("Got unknown pet type " + petTypeString + ". Allowed pet types: " + clinicService.findPetTypes());
 
     }
 
