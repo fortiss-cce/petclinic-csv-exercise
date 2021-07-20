@@ -1,8 +1,6 @@
 package org.springframework.samples.petclinic.rest.importcsv;
 
-import jdk.nashorn.internal.runtime.ParserException;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.beans.factory.parsing.ParseState;
 import org.springframework.dao.DataAccessException;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
@@ -12,12 +10,13 @@ import org.springframework.samples.petclinic.model.Pet;
 import org.springframework.samples.petclinic.model.PetType;
 import org.springframework.samples.petclinic.service.ClinicService;
 import org.springframework.security.access.prepost.PreAuthorize;
-import org.springframework.security.core.parameters.P;
 import org.springframework.web.bind.annotation.*;
 
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
-import java.util.*;
+import java.util.Date;
+import java.util.LinkedList;
+import java.util.List;
 import java.util.stream.Collectors;
 
 @RestController
