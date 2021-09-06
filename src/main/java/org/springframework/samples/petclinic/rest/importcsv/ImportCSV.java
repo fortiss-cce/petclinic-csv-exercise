@@ -1,6 +1,5 @@
 package org.springframework.samples.petclinic.rest.importcsv;
 
-import jdk.internal.net.http.common.Pair;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
