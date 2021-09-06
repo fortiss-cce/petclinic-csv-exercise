@@ -13,10 +13,15 @@ import org.springframework.web.bind.annotation.*;
 
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
-import java.util.ArrayList;
-import java.util.LinkedList;
-import java.util.List;
+
+//removed wildcard import
+import java.util.*;
+
 import java.util.stream.Collectors;
+
+/* This class implements the Petclionic Service in the backend.
+* The input is a CSV format with semi-colons (;) as separator.
+*/
 
 @RestController
 @CrossOrigin(exposedHeaders = "errors, content-type")
@@ -41,19 +46,20 @@ public class ImportCSV {
             pet = new Pet();
 
             String field = "";
-            while (i < csv.length() && csv.charAt(i) != ';') {
+
+/*            while (i < csv.length() && csv.charAt(i) != ';') {
                 field += csv.charAt(i++);
             }
             i++;
 
             pet.setName(field);
-
-            field = "";
+*/
+            /*field = "";
             while (i < csv.length() && csv.charAt(i) != ';') {
                 field += csv.charAt(i++);
             }
-            i++;
-
+            i++;*/
+/*
             try {
                 pet.setBirthDate((new SimpleDateFormat("yyyy-MM-dd")).parse(field));
             } catch (ParseException e) {
@@ -61,7 +67,7 @@ public class ImportCSV {
                 headers.add("errors", "date " + field + " not valid");
                 return new ResponseEntity<List<Pet>>(headers, HttpStatus.BAD_REQUEST);
             }
-
+*/
             field = "";
             while (i < csv.length() && csv.charAt(i) != ';') {
                 field += csv.charAt(i++);
@@ -136,4 +142,77 @@ public class ImportCSV {
 
         return new ResponseEntity<List<Pet>>(pets, HttpStatus.OK);
     }
+
+
+
+    private List<String> segment_csv_int_string_list(String csv)
+    {
+        List<String> entries;
+
+        entries = Arrays.asList(csv.split(";"));
+
+        return entries;
+    }
+
+    private Pet convert_string_list_to_pet( List<String> list)
+    {
+        Pet pet = new Pet();
+        pet.setName(list.get(0));
+        pet.setBirthDate(convert_birth_date_from_string(list.get(1)));
+
+        return pet;
+    }
+
+    private Date convert_birth_date_from_string(String birth_date_string)
+    {
+        Date date = new Date();
+
+        SimpleDateFormat simple_date_format = new SimpleDateFormat("yyyy-MM-dd");
+
+        try {
+            date = simple_date_format.parse(birth_date_string);
+        }
+        catch (ParseException e) {
+            HttpHeaders headers = new HttpHeaders();
+            headers.add("errors", "date " + birth_date_string + " not valid");
+
+        }
+
+        return date;
+
+    }
+
+    private ArrayList<PetType> get_pet_types_from_server()
+    {
+        ArrayList<PetType> pet_type_list = (ArrayList<PetType>) clinicService.findPetTypes();
+        return pet_type_list;
+    }
+
+    private PetType search_for_pet_type_in_list(String entry)
+    {
+        PetType pet_type = new PetType();
+
+        ArrayList<PetType> pet_type_list = get_pet_types_from_server();
+
+        for (int j = 0; j < pet_type_list.size(); j++)
+        {
+            if (pet_type_list.get(j).getName().toLowerCase().equals(entry))
+            {
+                pet_type= pet_type_list.get(j);
+                break;
+            }
+        }
+
+        return pet_type;
+
+    }
+
+
+    /*
+        ArrayList<PetType> ts = (ArrayList<PetType>) clinicService.findPetTypes();
+
+    }
+*/
+
+
 }
