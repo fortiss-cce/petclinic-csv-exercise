@@ -23,6 +23,109 @@ import java.util.stream.Collectors;
 @RequestMapping("api/import")
 public class ImportCSV {
 
+    class ParsedEntity {
+
+        private String field;
+        private int pos;
+
+        /***
+         * contructor
+         * @param field
+         * @param pos
+         */
+        public ParsedEntity(String field, int pos) {
+            this.field = field;
+            this.pos = pos;
+        }
+
+        public String getField() {
+            return field;
+        }
+
+        public void setField(String field) {
+            this.field = field;
+        }
+
+        public int getPos() {
+            return pos;
+        }
+
+        public void setPos(int pos) {
+            this.pos = pos;
+        }
+    }
+
+    /***
+     * parse the entity
+     * @param csv : csv string
+     * @param pos : start pared position
+     * @return
+     */
+    public ParsedEntity parseEntity(String csv, int pos) {
+        String field = "";
+
+        while (pos < csv.length() && (csv.charAt(pos) != ';' && csv.charAt(pos) != '\n')) {
+            field += csv.charAt(pos++);
+        }
+        return new ParsedEntity(field, pos);
+    }
+
+    /***
+     * delete the pet record
+     * @param pet
+     * @return
+     */
+    public boolean deregisterPetFromOwner(Pet pet) {
+        for (Pet q : pet.getOwner().getPets()) {
+            if (q.getName().equals(pet.getName())) {
+                if (q.getType().getId().equals(pet.getType().getId())) {
+                    if (pet.getBirthDate().equals(q.getBirthDate())) {
+                        this.clinicService.deletePet(q);
+                        return true;
+                    }
+                }
+            }
+        }
+        return false;
+    }
+
+    /***
+     * set pet type
+     * @param pet
+     * @param fieldObj
+     * @return
+     */
+    public Pet setPetType(Pet pet, ParsedEntity fieldObj) {
+
+        ArrayList<PetType> ts = (ArrayList<PetType>) clinicService.findPetTypes();
+
+        for (int j = 0; j < ts.size(); j++) {
+            if (ts.get(j).getName().toLowerCase().equals(fieldObj.getField())) {
+                pet.setType(ts.get(j));
+                break;
+            }
+        }
+        return pet;
+    }
+
+    /***
+     * get matching owners error
+     * @param matchingOwners
+     * @return
+     */
+    public ResponseEntity<List<Pet>> getMatchingOwnerErrorMsg(List<Owner> matchingOwners) {
+
+        HttpHeaders headers = new HttpHeaders();
+        if (matchingOwners.size() == 0) {
+            headers.add("errors", "Owner not found");
+            return new ResponseEntity<List<Pet>>(headers, HttpStatus.BAD_REQUEST);
+        } else {
+            headers.add("errors", "Owner not unique");
+            return new ResponseEntity<List<Pet>>(headers, HttpStatus.BAD_REQUEST);
+        }
+    }
+
+
     @Autowired
     private ClinicService clinicService;
 
@@ -33,106 +136,62 @@ public class ImportCSV {
         produces = "application/json")
     public ResponseEntity<List<Pet>> importPets(@RequestBody String csv) {
 
-        int i = 0;
+        int pos = 0;
         List<Pet> pets = new LinkedList<Pet>();
         Pet pet;
+        ParsedEntity fieldObj;
 
         do {
             pet = new Pet();
 
-            String field = "";
-            while (i < csv.length() && csv.charAt(i) != ';') {
-                field += csv.charAt(i++);
-            }
-            i++;
+            fieldObj = this.parseEntity(csv, pos);
+            pet.setName(fieldObj.getField());
 
-            pet.setName(field);
-
-            field = "";
-            while (i < csv.length() && csv.charAt(i) != ';') {
-                field += csv.charAt(i++);
-            }
-            i++;
-
+            pos = fieldObj.getPos() + 1;
+            fieldObj = this.parseEntity(csv, pos);
             try {
-                pet.setBirthDate((new SimpleDateFormat("yyyy-MM-dd")).parse(field));
+                pet.setBirthDate((new SimpleDateFormat("yyyy-MM-dd")).parse(fieldObj.getField()));
             } catch (ParseException e) {
                 HttpHeaders headers = new HttpHeaders();
-                headers.add("errors", "date " + field + " not valid");
+                headers.add("errors", "date " + fieldObj.getField() + " not valid");
                 return new ResponseEntity<List<Pet>>(headers, HttpStatus.BAD_REQUEST);
             }
 
-            field = "";
-            while (i < csv.length() && csv.charAt(i) != ';') {
-                field += csv.charAt(i++);
-            }
-            i++;
+            pos = fieldObj.getPos() + 1;
+            fieldObj = this.parseEntity(csv, pos);
+            pet = this.setPetType(pet, fieldObj);
 
-            if (pet != null) {
-                ArrayList<PetType> ts = (ArrayList<PetType>) clinicService.findPetTypes();
-                for (int j = 0; j < ts.size(); j++) {
-                    if (ts.get(j).getName().toLowerCase().equals(field)) {
-                        pet.setType(ts.get(j));
-                        break;
-                    }
-                }
-            }
-
-            field = "";
-            while (i < csv.length() && (csv.charAt(i) != ';' && csv.charAt(i) != '\n')) {
-                field += csv.charAt(i++);
-            }
-
-            if (pet != null) {
-                String owner = field;
-                List<Owner> matchingOwners = clinicService.findAllOwners()
-                    .stream()
-                    .filter(o -> o.getLastName().equals(owner))
-                    .collect(Collectors.toList());
-
-                if (matchingOwners.size() == 0) {
-                    HttpHeaders headers = new HttpHeaders();
-                    headers.add("errors", "Owner not found");
-                    return new ResponseEntity<List<Pet>>(headers, HttpStatus.BAD_REQUEST);
-                }
-                if (matchingOwners.size() > 1) {
-                    HttpHeaders headers = new HttpHeaders();
-                    headers.add("errors", "Owner not unique");
-                    return new ResponseEntity<List<Pet>>(headers, HttpStatus.BAD_REQUEST);
-                }
+            pos = fieldObj.getPos() + 1;
+            fieldObj = this.parseEntity(csv, pos);
+            String owner = fieldObj.getField();
+            List<Owner> matchingOwners = clinicService.findAllOwners()
+                .stream()
+                .filter(o -> o.getLastName().equals(owner))
+                .collect(Collectors.toList());
+            if (matchingOwners.size() == 1) {
                 pet.setOwner(matchingOwners.iterator().next());
+            } else {
+                return this.getMatchingOwnerErrorMsg(matchingOwners);
             }
 
-            if (csv.charAt(i) == ';') {
-                i++;
-
-                field = "";
-                while (i < csv.length() && csv.charAt(i) != '\n') {
-                    field += csv.charAt(i++);
-                }
-
-                if (field.toLowerCase().equals("add")) {
+            pos = fieldObj.getPos();
+            if (csv.charAt(pos) == ';') {
+                pos++;
+                fieldObj = this.parseEntity(csv, pos);
+                if (fieldObj.getField().equalsIgnoreCase("add")) {
                     clinicService.savePet(pet);
                 } else {
-                    for (Pet q : pet.getOwner().getPets()) {
-                        if (q.getName().equals(pet.getName())) {
-                            if (q.getType().getId().equals(pet.getType().getId())) {
-                                if (pet.getBirthDate().equals(q.getBirthDate())) {
-                                    clinicService.deletePet(q);
-                                }
-                            }
-                        }
-                    }
+                    this.deregisterPetFromOwner(pet);
                 }
-
             } else {
                 clinicService.savePet(pet);
             }
-            i++;
 
             pets.add(pet);
 
-        } while (i < csv.length() && pet != null);
+            pos = fieldObj.getPos() + 1;
+
+        } while (pos < csv.length() && pet != null);
 
         return new ResponseEntity<List<Pet>>(pets, HttpStatus.OK);
     }
