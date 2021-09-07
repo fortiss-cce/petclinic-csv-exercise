@@ -118,11 +118,11 @@ public class ImportCSV {
 
         ArrayList<PetType> pet_type_list = get_pet_types_from_server();
 
-        for (int j = 0; j < pet_type_list.size(); j++)
+        for (int petIndex = 0; petIndex < pet_type_list.size(); petIndex++)
         {
-            if (pet_type_list.get(j).getName().toLowerCase().equals(entry))
+            if (pet_type_list.get(petIndex).getName().toLowerCase().equals(entry))
             {
-                pet_type= pet_type_list.get(j);
+                pet_type= pet_type_list.get(petIndex);
                 break;
             }
         }
