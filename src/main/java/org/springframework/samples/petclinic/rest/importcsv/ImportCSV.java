@@ -149,7 +149,6 @@ public class ImportCSV {
 
             pos = fieldObj.getPos() + 1;
             fieldObj = this.parseEntity(csv, pos);
-
             try {
                 pet.setBirthDate((new SimpleDateFormat("yyyy-MM-dd")).parse(fieldObj.getField()));
             } catch (ParseException e) {
@@ -160,15 +159,10 @@ public class ImportCSV {
 
             pos = fieldObj.getPos() + 1;
             fieldObj = this.parseEntity(csv, pos);
-
-            //if (pet != null) {
             pet = this.setPetType(pet, fieldObj);
-            //}
 
             pos = fieldObj.getPos() + 1;
             fieldObj = this.parseEntity(csv, pos);
-
-            //if (pet != null) {
             String owner = fieldObj.getField();
             List<Owner> matchingOwners = clinicService.findAllOwners()
                 .stream()
@@ -180,27 +174,22 @@ public class ImportCSV {
                 return this.getMatchingOwnerErrorMsg(matchingOwners);
             }
 
-            //}
-
             pos = fieldObj.getPos();
-
             if (csv.charAt(pos) == ';') {
                 pos++;
-
                 fieldObj = this.parseEntity(csv, pos);
-
                 if (fieldObj.getField().equalsIgnoreCase("add")) {
                     clinicService.savePet(pet);
                 } else {
                     this.deregisterPetFromOwner(pet);
                 }
-
             } else {
                 clinicService.savePet(pet);
             }
-            pos = fieldObj.getPos() + 1;
 
             pets.add(pet);
+
+            pos = fieldObj.getPos() + 1;
 
         } while (pos < csv.length() && pet != null);
 
