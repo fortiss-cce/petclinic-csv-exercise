@@ -17,6 +17,7 @@ import java.text.SimpleDateFormat;
 //removed wildcard import
 import java.util.*;
 
+
 import java.util.stream.Collectors;
 
 /* This class implements the Petclionic Service in the backend.
@@ -39,11 +40,10 @@ public class ImportCSV {
         produces = "application/json")
     public ResponseEntity<List<Pet>> importPets(@RequestBody String csv) {
 
-        /*int i = 0;*/
         List<Pet> pets = new LinkedList<Pet>();
         Pet pet;
 
-        List<String> splitCSV = segment_csv_into_string_list(csv);
+        List<String> splitCSV = segment_line_to_entries(csv);
         pet = convert_string_list_to_pet( splitCSV );
         // DON'T FORGET TO ADD ERROR HANDLING FOR pet.setOwner:
         // return new ResponseEntity<List<Pet>>(headers, HttpStatus.BAD_REQUEST);
@@ -59,18 +59,31 @@ public class ImportCSV {
         return new ResponseEntity<List<Pet>>(pets, HttpStatus.OK);
     }
 
+    private List<String> convert_csv_to_lines(String csv)
+    {
+        List<String> lines;
 
-    private List<String> segment_csv_into_string_list(String csv)
+        lines = Arrays.asList(csv.split("\n"));
+
+        return lines;
+
+    }
+
+
+    private List<String> segment_line_to_entries(String lines)
     {
         List<String> entries;
 
-        entries = Arrays.asList(csv.split(";"));
+        entries = Arrays.asList(lines.split(";"));
 
         return entries;
     }
 
+
+
     private Pet convert_string_list_to_pet( List<String> list )
     {
+
         Pet pet = new Pet();
         pet.setName(list.get(0));
         pet.setBirthDate(convert_birth_date_from_string(list.get(1)));
