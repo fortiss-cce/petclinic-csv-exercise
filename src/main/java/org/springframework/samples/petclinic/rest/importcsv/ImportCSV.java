@@ -24,10 +24,16 @@ import java.util.stream.Collectors;
 public class ImportCSV {
 
     class ParsedEntity {
+
         private String field;
         private int pos;
 
-        public ParsedEntity(String field, int pos){
+        /***
+         * contructor
+         * @param field
+         * @param pos
+         */
+        public ParsedEntity(String field, int pos) {
             this.field = field;
             this.pos = pos;
         }
@@ -49,17 +55,27 @@ public class ImportCSV {
         }
     }
 
-    //first element: entry_string: String, second element: pos: Integer
-    public ParsedEntity parseEntity(String csv, int pos){
+    /***
+     * parse the entity
+     * @param csv : csv string
+     * @param pos : start pared position
+     * @return
+     */
+    public ParsedEntity parseEntity(String csv, int pos) {
         String field = "";
 
-        while(pos<csv.length() && (csv.charAt(pos) != ';' && csv.charAt(pos) != '\n')) {
+        while (pos < csv.length() && (csv.charAt(pos) != ';' && csv.charAt(pos) != '\n')) {
             field += csv.charAt(pos++);
         }
-        return new ParsedEntity(field,pos);
+        return new ParsedEntity(field, pos);
     }
 
-    public boolean deregisterPetFromOwner(Pet pet){
+    /***
+     * delete the pet record
+     * @param pet
+     * @return
+     */
+    public boolean deregisterPetFromOwner(Pet pet) {
         for (Pet q : pet.getOwner().getPets()) {
             if (q.getName().equals(pet.getName())) {
                 if (q.getType().getId().equals(pet.getType().getId())) {
@@ -73,7 +89,13 @@ public class ImportCSV {
         return false;
     }
 
-    public Pet setPetType(Pet pet, ParsedEntity fieldObj){
+    /***
+     * set pet type
+     * @param pet
+     * @param fieldObj
+     * @return
+     */
+    public Pet setPetType(Pet pet, ParsedEntity fieldObj) {
 
         ArrayList<PetType> ts = (ArrayList<PetType>) clinicService.findPetTypes();
 
@@ -86,14 +108,18 @@ public class ImportCSV {
         return pet;
     }
 
-    public ResponseEntity<List<Pet>> getMatchingOwnerErrorMsg(List<Owner> matchingOwners){
+    /***
+     * get matching owners error
+     * @param matchingOwners
+     * @return
+     */
+    public ResponseEntity<List<Pet>> getMatchingOwnerErrorMsg(List<Owner> matchingOwners) {
 
         HttpHeaders headers = new HttpHeaders();
-        if(matchingOwners.size() ==0){
+        if (matchingOwners.size() == 0) {
             headers.add("errors", "Owner not found");
             return new ResponseEntity<List<Pet>>(headers, HttpStatus.BAD_REQUEST);
-        }
-        else{
+        } else {
             headers.add("errors", "Owner not unique");
             return new ResponseEntity<List<Pet>>(headers, HttpStatus.BAD_REQUEST);
         }
@@ -136,24 +162,23 @@ public class ImportCSV {
             fieldObj = this.parseEntity(csv, pos);
 
             //if (pet != null) {
-                pet = this.setPetType(pet, fieldObj);
+            pet = this.setPetType(pet, fieldObj);
             //}
 
             pos = fieldObj.getPos() + 1;
             fieldObj = this.parseEntity(csv, pos);
 
             //if (pet != null) {
-                String owner = fieldObj.getField();
-                List<Owner> matchingOwners = clinicService.findAllOwners()
-                    .stream()
-                    .filter(o -> o.getLastName().equals(owner))
-                    .collect(Collectors.toList());
-                if(matchingOwners.size() == 1){
-                    pet.setOwner(matchingOwners.iterator().next());
-                }
-                else{
-                    return this.getMatchingOwnerErrorMsg(matchingOwners);
-                }
+            String owner = fieldObj.getField();
+            List<Owner> matchingOwners = clinicService.findAllOwners()
+                .stream()
+                .filter(o -> o.getLastName().equals(owner))
+                .collect(Collectors.toList());
+            if (matchingOwners.size() == 1) {
+                pet.setOwner(matchingOwners.iterator().next());
+            } else {
+                return this.getMatchingOwnerErrorMsg(matchingOwners);
+            }
 
             //}
 
@@ -164,7 +189,7 @@ public class ImportCSV {
 
                 fieldObj = this.parseEntity(csv, pos);
 
-                if (fieldObj.getField().toLowerCase().equals("add")) {
+                if (fieldObj.getField().equalsIgnoreCase("add")) {
                     clinicService.savePet(pet);
                 } else {
                     this.deregisterPetFromOwner(pet);
